@@ -8,7 +8,9 @@ import seaborn as sns
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 from ta.volatility import BollingerBands as BBands
 from ta.volatility import AverageTrueRange as ATR
@@ -36,7 +38,6 @@ features = {}
 
 features['DateTime'] = df['DateTime']
 features['Volume'] = df['Volume']
-features['LogReturn'] = df['Close']/df['Close'].shift(1)
 
 #BB_mavg and VWAP have a corr of 0.999
 #features['BB_mavg'] = bbands.bollinger_mavg()
@@ -53,13 +54,17 @@ features['VWAP'] = vwap.volume_weighted_average_price()
 features['StochRSI'] = stochrsi.stochrsi()
 features['ATR'] = atr.average_true_range()
 
+features['LogReturn'] = df['Close']/df['Close'].shift(1)
+features['Direction'] = (features['LogReturn'] >= 1).astype(int)
 features = pd.DataFrame(features)[20:]
 
-scaler = StandardScaler()
+scaler = MinMaxScaler()
 features_scaled = scaler.fit_transform(features.loc[:, features.columns != "DateTime"])
-features_scaled = pd.DataFrame(features_scaled, columns = ['Volume', 'LogReturn', 'BB_width', 'ADX_pos', 'ADX_neg', 'VWAP', 'StochRSI', 'ATR'])
+features_scaled = pd.DataFrame(features_scaled, columns = ['Volume', 'BB_width', 'ADX_pos', 'ADX_neg', 'VWAP', 'StochRSI', 'ATR', 'LogReturn', 'Direction'])
+features_scaled = features_scaled[:len(features_scaled)-1]
 
-train_data, test_data = train_test_split(features_scaled, test_size = 0.2, shuffle=False)
+kmeans = KMeans(n_clusters = 12, random_state=42)
+features_scaled['States'] = kmeans.fit_predict(features_scaled)
 
 '''
 ---------------Display---------------
@@ -71,8 +76,8 @@ print(df.dtypes)
 plt.plot(features['DateTime'], features['LogReturn'])
 plt.xlabel("DateTime")
 plt.ylabel("LogReturn")
-plt.show()
+#plt.show()
 
-print(features.head())
-print(train_data.head())
-print(test_data.head())
+print(features_scaled.describe())
+print(features_scaled)
+print(features)
