@@ -61,23 +61,48 @@ features = pd.DataFrame(features)[20:]
 scaler = MinMaxScaler()
 features_scaled = scaler.fit_transform(features.loc[:, features.columns != "DateTime"])
 features_scaled = pd.DataFrame(features_scaled, columns = ['Volume', 'BB_width', 'ADX_pos', 'ADX_neg', 'VWAP', 'StochRSI', 'ATR', 'LogReturn', 'Direction'])
-features_scaled = features_scaled[:len(features_scaled)-1]
 
 kmeans = KMeans(n_clusters = 12, random_state=42)
 features_scaled['States'] = kmeans.fit_predict(features_scaled)
+
+state_table = pd.DataFrame()
+state_table['Last_n'] = [x.values.tolist() for x in features_scaled['States'].rolling(4)]
+state_table['Last_n'] = state_table['Last_n'].apply(tuple)
+state_table['Next_dir'] = features_scaled['Direction'].shift(-1)
+state_table = state_table[4:]
+
+state_transition_count = {}
+state_transition_count['States'] = state_table['Last_n'].unique()
+state_transition_count = pd.DataFrame(state_transition_count)
+upcounts_l = []
+downcounts_l = []
+
+for i in range(len(state_transition_count)):
+    upcount = len(state_table[(state_table['Last_n'] == state_transition_count.iloc[i]['States']) & (state_table['Next_dir'] == 1.0)])
+    downcount = len(state_table[(state_table['Last_n'] == state_transition_count.iloc[i]['States']) & (state_table['Next_dir'] == 0.0)])
+    upcounts_l.append(upcount)
+    downcounts_l.append(downcount)
+
+state_transition_count['Up_count'] = upcounts_l
+state_transition_count['Down_count'] = downcounts_l
+state_transition_count['Up_prob'] = state_transition_count['Up_count'] / (state_transition_count['Up_count'] + state_transition_count['Down_count'])
+state_transition_count['Down_prob'] = state_transition_count['Down_count'] / (state_transition_count['Up_count'] + state_transition_count['Down_count'])
 
 '''
 ---------------Display---------------
 '''
 
-print(df.head())
-print(df.dtypes)
+#print(df.head())
+#print(df.dtypes)
 
-plt.plot(features['DateTime'], features['LogReturn'])
-plt.xlabel("DateTime")
-plt.ylabel("LogReturn")
+#plt.plot(features['DateTime'], features['LogReturn'])
+#plt.xlabel("DateTime")
+#plt.ylabel("LogReturn")
 #plt.show()
 
-print(features_scaled.describe())
-print(features_scaled)
-print(features)
+#print(features_scaled.describe())
+#print(features_scaled)
+#print(features)
+#print(state_table)
+print(state_transition_count['Up_prob'].describe())
+print(state_transition_count['Down_prob'].describe())
